@@ -41,6 +41,8 @@ class ReklamaciaForm(StatesGroup):
     waiting_for_product_name = State()
     waiting_for_production_date = State()
     waiting_for_reason = State()
+    waiting_for_photo_choice = State()   # новый шаг: выбор
+    waiting_for_photo = State()          # новый шаг: само фото
 
 # ======== GOOGLE SHEETS КЛИЕНТ ========
 SCOPES = [
@@ -98,8 +100,10 @@ def save_to_google_sheet(data: dict):
         data.get("product_name", ""),
         data.get("production_date", ""),
         data.get("reason", ""),
+        "да" if data.get("photo_id") else "нет",  # есть ли фото
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
+
 async def notify_about_claim(data: dict):
     """
     Отправить уведомление о новой рекламации
@@ -115,13 +119,24 @@ async def notify_about_claim(data: dict):
         f"❓ <b>Причина:</b> {data.get('reason', '—')}\n"
     )
 
+    photo_id = data.get("photo_id")
+
     for user_id in NOTIFY_USERS:
         try:
-            await bot.send_message(user_id, text, parse_mode="HTML")
+            if photo_id:
+                await bot.send_photo(
+                    user_id,
+                    photo=photo_id,
+                    caption=text,
+                    parse_mode="HTML",
+                )
+            else:
+                await bot.send_message(user_id, text, parse_mode="HTML")
         except Exception as e:
             logging.error(
                 f"Не удалось отправить уведомление пользователю {user_id}: {e}"
             )
+
 # ======== ХЭНДЛЕРЫ ========
 
 @dp.message(Command("start"))
@@ -248,12 +263,79 @@ async def process_production_date(message: types.Message, state: FSMContext):
 
 @dp.message(ReklamaciaForm.waiting_for_reason)
 async def process_reason(message: types.Message, state: FSMContext):
+    # сохраняем текст причины
     await state.update_data(reason=message.text)
+
+    # клавиатура "С фото / Без фото"
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📷 Прикрепить фото")],
+            [KeyboardButton(text="Без фото")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+    await message.answer(
+        "Хотите прикрепить фото к рекламации?",
+        reply_markup=keyboard,
+    )
+    await state.set_state(ReklamaciaForm.waiting_for_photo_choice)
+
+@dp.message(ReklamaciaForm.waiting_for_photo_choice)
+async def process_photo_choice(message: types.Message, state: FSMContext):
+    text = (message.text or "").lower()
+
+    if "без фото" in text:
+        # сразу завершаем рекламацию без фото
+        data = await state.get_data()
+        data["photo_id"] = None
+        save_to_google_sheet(data)
+        await notify_about_claim(data)
+
+        summary = (
+            "✅ <b>Рекламация зарегистрирована!</b>\n\n"
+            f"👩‍🍳 <b>Сотрудник:</b> {data.get('employee', '—')}\n"
+            f"🕐 <b>Дата и время:</b> {data.get('datetime', '—')}\n"
+            f"🏪 <b>Точка:</b> {data.get('point', '—')}\n"
+            f"📦 <b>Название ТСП:</b> {data.get('product_name', '—')}\n"
+            f"📅 <b>Дата производства ТСП:</b> {data.get('production_date', '—')}\n"
+            f"❓ <b>Причина:</b> {data.get('reason', '—')}\n"
+            f"🖼 <b>Фото:</b> нет\n\n"
+            "Данные записаны в Google‑таблицу."
+        )
+        await message.answer(
+            summary,
+            parse_mode="HTML",
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
+        await state.clear()
+        return
+
+    if "📷" in text or "фото" in text:
+        # просим прислать фото
+        await message.answer(
+            "📷 Отправьте фото одним сообщением.",
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
+        await state.set_state(ReklamaciaForm.waiting_for_photo)
+        return
+
+    await message.answer(
+        "Пожалуйста, выберите один из вариантов: «📷 Прикрепить фото» или «Без фото»."
+    )
+
+@dp.message(ReklamaciaForm.waiting_for_photo)
+async def process_photo(message: types.Message, state: FSMContext):
+    if not message.photo:
+        await message.answer("⚠️ Пожалуйста, отправьте именно фото.")
+        return
+
+    photo_id = message.photo[-1].file_id
+    await state.update_data(photo_id=photo_id)
 
     data = await state.get_data()
     save_to_google_sheet(data)
-
-    # Уведомление ответственному пользователю
     await notify_about_claim(data)
 
     summary = (
@@ -263,10 +345,10 @@ async def process_reason(message: types.Message, state: FSMContext):
         f"🏪 <b>Точка:</b> {data.get('point', '—')}\n"
         f"📦 <b>Название ТСП:</b> {data.get('product_name', '—')}\n"
         f"📅 <b>Дата производства ТСП:</b> {data.get('production_date', '—')}\n"
-        f"❓ <b>Причина:</b> {data.get('reason', '—')}\n\n"
+        f"❓ <b>Причина:</b> {data.get('reason', '—')}\n"
+        f"🖼 <b>Фото:</b> да\n\n"
         "Данные записаны в Google‑таблицу."
     )
-
     await message.answer(summary, parse_mode="HTML")
     await state.clear()
 
@@ -276,9 +358,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
-
-
-
