@@ -106,16 +106,15 @@ async def notify_about_claim(data: dict):
     Отправить уведомление о новой рекламации
     всем пользователям из NOTIFY_USERS.
     """
-    text = (
-        "<b>Новая рекламация</b>\\n\\n"
-        f"👩‍🍳 <b>Сотрудник:</b> {data.get('employee', '—')}\\n"
-        f"🕐 <b>Дата и время:</b> {data.get('datetime', '—')}\\n"
-        f"🏪 <b>Точка:</b> {data.get('point', '—')}\\n"
-        f"📦 <b>Название ТСП:</b> {data.get('product_name', '—')}\\n"
-        f"📅 <b>Дата производства ТСП:</b> {data.get('production_date', '—')}\\n"
-        f"❓ <b>Причина:</b> {data.get('reason', '—')}\\n"
+  text = (
+        "<b>Новая рекламация</b>\n\n"
+        f"👩‍🍳 <b>Сотрудник:</b> {data.get('employee', '—')}\n"
+        f"🕐 <b>Дата и время:</b> {data.get('datetime', '—')}\n"
+        f"🏪 <b>Точка:</b> {data.get('point', '—')}\n"
+        f"📦 <b>Название ТСП:</b> {data.get('product_name', '—')}\n"
+        f"📅 <b>Дата производства ТСП:</b> {data.get('production_date', '—')}\n"
+        f"❓ <b>Причина:</b> {data.get('reason', '—')}\n"
     )
-
     for user_id in NOTIFY_USERS:
         try:
             await bot.send_message(user_id, text, parse_mode="HTML")
@@ -278,6 +277,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
