@@ -15,8 +15,12 @@ from google.oauth2.service_account import Credentials
 BOT_TOKEN = "8638719493:AAFGAYy42JLNPwaKMAK889FGvvYXhAS1tY0"
 GSHEET_ID = "17fAKPY0DqBKW5E-7uviyyF9jfPXDqIl_2SGXZmo63hY"
 
-# Пользователь, которому шлём уведомления о новых рекламациях
-NOTIFY_USER_ID = 292361413  # V_Tenyakov (Теняков Владимир)
+# Пользователи, которым шлём уведомления о новых рекламациях
+NOTIFY_USERS = [
+    1784012770,  # Ganina_Angelina (Ганина Ангелина)
+    1053742352,  # V_Skalskaya (Скальская Вероника)
+    292361413,   # V_Tenyakov (Теняков Владимир)
+]
 
 logging.basicConfig(level=logging.INFO)
 
@@ -270,3 +274,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
