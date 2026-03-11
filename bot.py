@@ -38,10 +38,10 @@ SCOPES = [
 ]
 
 creds = Credentials.from_service_account_file(
-    "data/service_account.json",
+    "data/service_account_real.json",
     scopes=SCOPES,
 )
-gc = gspread.service_account(filename="data/service_account.json")
+gc = gspread.service_account(filename="data/service_account_real.json")
 sh = gc.open_by_key(GSHEET_ID)
 ws = sh.sheet1                 # лист с рекламациями
 users_ws = sh.worksheet("users")  # лист с сотрудниками
@@ -229,5 +229,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
