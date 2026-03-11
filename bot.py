@@ -100,13 +100,12 @@ def save_to_google_sheet(data: dict):
         data.get("reason", ""),
     ]
     ws.append_row(row, value_input_option="USER_ENTERED")
-
 async def notify_about_claim(data: dict):
     """
     Отправить уведомление о новой рекламации
     всем пользователям из NOTIFY_USERS.
     """
-  text = (
+    text = (
         "<b>Новая рекламация</b>\n\n"
         f"👩‍🍳 <b>Сотрудник:</b> {data.get('employee', '—')}\n"
         f"🕐 <b>Дата и время:</b> {data.get('datetime', '—')}\n"
@@ -115,6 +114,7 @@ async def notify_about_claim(data: dict):
         f"📅 <b>Дата производства ТСП:</b> {data.get('production_date', '—')}\n"
         f"❓ <b>Причина:</b> {data.get('reason', '—')}\n"
     )
+
     for user_id in NOTIFY_USERS:
         try:
             await bot.send_message(user_id, text, parse_mode="HTML")
@@ -122,7 +122,6 @@ async def notify_about_claim(data: dict):
             logging.error(
                 f"Не удалось отправить уведомление пользователю {user_id}: {e}"
             )
-
 # ======== ХЭНДЛЕРЫ ========
 
 @dp.message(Command("start"))
@@ -277,6 +276,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
