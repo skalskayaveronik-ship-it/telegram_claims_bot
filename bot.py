@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from datetime import datetime
+from datetime import datetime, date
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -43,7 +43,7 @@ creds = Credentials.from_service_account_file(
 )
 gc = gspread.service_account(filename="data/service_account_real.json")
 sh = gc.open_by_key(GSHEET_ID)
-ws = sh.sheet1                 # лист с рекламациями
+ws = sh.sheet1                    # лист с рекламациями
 users_ws = sh.worksheet("users")  # лист с сотрудниками
 
 bot = Bot(token=BOT_TOKEN)
@@ -178,7 +178,8 @@ async def process_name(message: types.Message, state: FSMContext):
 async def process_point(message: types.Message, state: FSMContext):
     await state.update_data(point=message.text)
     await message.answer(
-        "📦 Введите <b>название ТСП</b> (товара):",
+        "📦 Введите <b>название ТСП</b> (товара).\n"
+        "Можете писать просто название, бот сам добавит «ТСП » в начало.",
         parse_mode="HTML",
         reply_markup=types.ReplyKeyboardRemove(),  # убрать кнопки точек
     )
@@ -186,16 +187,49 @@ async def process_point(message: types.Message, state: FSMContext):
 
 @dp.message(ReklamaciaForm.waiting_for_product_name)
 async def process_product_name(message: types.Message, state: FSMContext):
-    await state.update_data(product_name=message.text)
+    text = message.text.strip()
+
+    # если пользователь не написал ТСП, добавляем автоматически (без учёта регистра)
+    if not text.lower().startswith("тсп"):
+        text = f"ТСП {text}"
+
+    await state.update_data(product_name=text)
+
     await message.answer(
-        "📅 Введите <b>дату производства ТСП</b> (например, 05.03.2026):",
+        "📅 Введите <b>дату производства ТСП</b>.\n"
+        "Форматы: ДД.ММ.ГГГГ или ДД.ММ (год подставится текущий).\n"
+        "Например: 05.03.2026 или 05.03",
         parse_mode="HTML",
     )
     await state.set_state(ReklamaciaForm.waiting_for_production_date)
 
 @dp.message(ReklamaciaForm.waiting_for_production_date)
 async def process_production_date(message: types.Message, state: FSMContext):
-    await state.update_data(production_date=message.text)
+    text = message.text.strip()
+
+    parsed_date = None
+
+    # пробуем два формата: с годом и без
+    for fmt in ("%d.%m.%Y", "%d.%m"):
+        try:
+            dt = datetime.strptime(text, fmt)
+            if fmt == "%d.%m":
+                dt = dt.replace(year=date.today().year)
+            parsed_date = dt.date()
+            break
+        except ValueError:
+            continue
+
+    if not parsed_date:
+        await message.reply(
+            "⚠️ Не смог разобрать дату.\n"
+            "Пожалуйста, введите дату в формате ДД.ММ.ГГГГ или ДД.ММ.\n"
+            "Примеры: 11.03.2026 или 11.03",
+        )
+        return  # остаёмся в этом же состоянии, не падаем
+
+    await state.update_data(production_date=parsed_date.strftime("%d.%m.%Y"))
+
     await message.answer("❓ Введите <b>причину рекламации</b>:", parse_mode="HTML")
     await state.set_state(ReklamaciaForm.waiting_for_reason)
 
@@ -229,6 +263,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
