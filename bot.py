@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -19,6 +19,13 @@ GSHEET_ID = "17fAKPY0DqBKW5E-7uviyyF9jfPXDqIl_2SGXZmo63hY"
 NOTIFY_USER_ID = 292361413  # V_Tenyakov (Теняков Владимир)
 
 logging.basicConfig(level=logging.INFO)
+
+# Часовой пояс (пример: Владивосток UTC+10)
+LOCAL_TZ = timezone(timedelta(hours=10))
+
+def now_local() -> datetime:
+    """Текущее время в нужном часовом поясе."""
+    return datetime.now(tz=LOCAL_TZ)
 
 # Точки
 POINTS = ["Романи", "Диди", "Центр", "Меоре"]
@@ -73,7 +80,7 @@ def register_user(user: types.User, full_name: str):
             user.id,
             user.username or "",
             full_name,
-            datetime.now().strftime("%d.%m.%Y %H:%M"),
+            now_local().strftime("%d.%m.%Y %H:%M"),
         ],
         value_input_option="USER_ENTERED",
     )
@@ -97,7 +104,7 @@ async def notify_about_claim(data: dict):
     """
     text = (
         "<b>Новая рекламация</b>\n\n"
-        f"👩‍🍳 <b>Сотрудник:</b> {data.get('employee', '—')}\n"
+        f"👩‍🍳 <bСотрудник:</b> {data.get('employee', '—')}\n"
         f"🕐 <b>Дата и время:</b> {data.get('datetime', '—')}\n"
         f"🏪 <b>Точка:</b> {data.get('point', '—')}\n"
         f"📦 <b>Название ТСП:</b> {data.get('product_name', '—')}\n"
@@ -114,7 +121,7 @@ async def notify_about_claim(data: dict):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     """
-    Сразу запускаем анкету, как было изначально:
+    Сразу запускаем анкету:
     либо спрашиваем ФИО, либо показываем выбор точки.
     """
     await state.clear()
@@ -130,8 +137,8 @@ async def cmd_start(message: types.Message, state: FSMContext):
         await state.set_state(ReklamaciaForm.waiting_for_name)
         return
 
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
-    await state.update_data(datetime=now, employee=user_full_name)
+    now_str = now_local().strftime("%d.%m.%Y %H:%M")
+    await state.update_data(datetime=now_str, employee=user_full_name)
 
     keyboard = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=name)] for name in POINTS],
@@ -140,7 +147,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
     )
 
     await message.answer(
-        f"🕐 <b>Дата и время рекламации:</b> {now}\n\n"
+        f"🕐 <b>Дата и время рекламации:</b> {now_str}\n\n"
         "🏪 Выберите <b>точку</b> из списка или введите своё название:",
         parse_mode="HTML",
         reply_markup=keyboard,
@@ -156,8 +163,8 @@ async def process_name(message: types.Message, state: FSMContext):
 
     register_user(message.from_user, full_name)
 
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
-    await state.update_data(datetime=now, employee=full_name)
+    now_str = now_local().strftime("%d.%m.%Y %H:%M")
+    await state.update_data(datetime=now_str, employee=full_name)
 
     keyboard = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=name)] for name in POINTS],
@@ -167,7 +174,7 @@ async def process_name(message: types.Message, state: FSMContext):
 
     await message.answer(
         f"✅ Спасибо, {full_name}.\n\n"
-        f"🕐 <b>Дата и время рекламации:</b> {now}\n\n"
+        f"🕐 <b>Дата и время рекламации:</b> {now_str}\n\n"
         "🏪 Теперь выберите <b>точку</b> из списка или введите своё название:",
         parse_mode="HTML",
         reply_markup=keyboard,
@@ -214,7 +221,7 @@ async def process_production_date(message: types.Message, state: FSMContext):
         try:
             dt = datetime.strptime(text, fmt)
             if fmt == "%d.%m":
-                dt = dt.replace(year=date.today().year)
+                dt = dt.replace(year=now_local().year)
             parsed_date = dt.date()
             break
         except ValueError:
